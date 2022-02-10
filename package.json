@@ -19,5 +19,9 @@
   "bugs": {
     "url": "https://github.com/sskalnik/quest/issues"
   },
-  "homepage": "https://github.com/sskalnik/quest#readme"
+  "homepage": "https://github.com/sskalnik/quest#readme",
+  "devDependencies": {
+    "eslint": "^7.32.0",
+    "eslint-config-google": "^0.14.0"
+  }
 }
