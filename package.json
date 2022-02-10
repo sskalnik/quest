@@ -1,7 +1,7 @@
 {
   "name": "quest",
   "version": "1.0.0",
-  "description": "",
+  "description": "It is a fun way to assess your cloud skills. It is also a good representative sample of the work we do at Rearc. Quest is a webapp made with node.js and golang.",
   "main": "src/000.js",
   "scripts": {
     "start": "node src/000.js"
@@ -11,5 +11,13 @@
   },
   "keywords": [],
   "author": "Rearc",
-  "license": "ISC"
+  "license": "No idea, but I am assuming Rearc.io own the original code, and that I am only allowed to modify and otherwise use it within the context of this test... I mean quest.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sskalnik/quest.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sskalnik/quest/issues"
+  },
+  "homepage": "https://github.com/sskalnik/quest#readme"
 }
