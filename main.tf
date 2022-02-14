@@ -1,3 +1,34 @@
+data "aws_region" "current" {}
+
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+resource "random_shuffle" "get_a_random_az" {
+  input        = data.aws_availability_zones.available.names
+  result_count = 1
+}
+
+data "aws_vpc" "vpc" {
+  id = var.vpc_id
+}
+
+
+# If no public subnet(s) provided via input variables, create a public subnet
+resource "aws_subnet" "quest_public_subnet" {
+  # If the length of the list `var.public_subnet_ids` is a non-zero number (i.e., a list of subnet IDs was passed in via input variables):
+  #   Do not create this resource
+  # Else
+  #   Create a public subnet
+  count = length(var.public_subnet_ids) > 0 ? 0 : 1
+
+  vpc_id                  = var.vpc_id
+  cidr_block              = cidrsubnet(data.aws_vpc.vpc.cidr_block, 4, 1)
+  availability_zone       = random_shuffle.get_a_random_az.result
+  map_public_ip_on_launch = true
+}
+
+
 # Create an AWS ECR (Elastic Container Repository) to store the Docker container(s)
 resource "aws_ecr_repository" "quest_ecr" {
   name = "quest_ecr"
@@ -7,6 +38,7 @@ resource "aws_ecr_repository" "quest_ecr" {
     scan_on_push = true
   }
 }
+
 
 # Create an AWS ECS Cluster where the ECS/Fargate Tasks will run
 resource "aws_ecs_cluster" "quest_cluster" {
@@ -71,7 +103,8 @@ resource "aws_ecs_service" "quest_ecs_service" {
   desired_count   = var.ecs_service_desired_task_count
 
   network_configuration {
-    subnets          = var.public_subnet_ids
+    # Either use the input variable var.public_subnet_ids, or use a singleton list containing the ID of a public subnet that is only created when none are input.
+    subnets          = length(var.public_subnet_ids) > 0 ? var.public_subnet_ids : [aws_subnet.quest_public_subnet.id]
     # Please don't dock too many points for the following potential security issue 🥺👉🏽👈🏽
     assign_public_ip = true # Required for Fargate + ECR: https://aws.amazon.com/premiumsupport/knowledge-center/ecs-pull-container-api-error-ecr/
     security_groups  = [aws_security_group.quest_ecs_service_sg.id]
@@ -95,7 +128,7 @@ resource "aws_alb" "quest_alb" {
 
 
 resource "aws_lb_target_group" "quest_alb_target_group" {
-  name        = "quest_alb_target_group"
+  name        = "quest-alb-target-group" # The fact that this field can include hyphens but not underscores is a source of great ire...
   port        = 80
   protocol    = "HTTP"
   target_type = "ip"
@@ -124,11 +157,29 @@ resource "aws_lb_listener" "quest_alb_listener_http" {
 resource "aws_security_group" "quest_alb_sg" {
   description = "Allow HTTP 80 TCP and HTTPS 443 TCP incoming to the ALB. Allow any outgoing traffic."
 
-  # Check out my use of both styles! 😊
   ingress_rules       = ["http-80-tcp", "https-443-tcp"]
   ingress_cidr_blocks = ["0.0.0.0/0"]
 
+  ingress {
+    description = "Allow incoming HTTP 80 TCP from anywhere (public Internet) to the ALB."
+    from_port   = 80
+    to_port     = 80
+    protocol    = "-1"
+    #tfsec:ignore:AWS008
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Allow incoming HTTPS 443 TCP from anywhere (public Internet) to the ALB."
+    from_port   = 443
+    to_port     = 443
+    protocol    = "-1"
+    #tfsec:ignore:AWS008
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
+    description = "Allow any/all outgoing traffic from the ALB (including to the public Internet)."
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
