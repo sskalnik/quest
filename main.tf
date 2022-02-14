@@ -36,7 +36,8 @@ resource "aws_ecs_task_definition" "quest_ecs_fargate_task" {
   network_mode             = "awsvpc"    # Required for Fargate!
   memory                   = 512         # This must match the "memory" value from the `container_definitions` block above!
   cpu                      = 256         # This must match the "cpu" value from the `container_definitions` block above!
-  execution_role_arn       = aws_iam_role.ecsTaskExecutionRole.arn
+  execution_role_arn       = aws_iam_role.ecsTaskExecutionRole.arn # ECS Service uses this Role
+  task_role_arn            = aws_iam_role.quest_ecs_fargate_task_role.arn # The Tasks themselves use this Role (similar to EC2 Instance Profile)
 }
 
 
@@ -137,14 +138,33 @@ resource "aws_security_group" "quest_alb_sg" {
 }
 
 
-###################################################################################################
-# Boilerplate code to set up the AWS Service Role "ecsTaskExecutionRole" and its related Policies #
-resource "aws_iam_role" "ecsTaskExecutionRole" {
-  name               = "ecsTaskExecutionRole"
-  assume_role_policy = data.aws_iam_policy_document.assume_role_policy.json
+# The ECS/Fargate Task(s) will use the following IAM Role for any interactions with other AWS resources.
+# This is analogous to an EC2 Instance's Instance Profile.
+resource "aws_iam_role" "quest_ecs_fargate_task_role" {
+  name_prefix        = "quest_ecs_fargate"
+  assume_role_policy = data.aws_iam_policy_document.quest_ecs_fargate_task_role_policy_document.json
 }
 
-data "aws_iam_policy_document" "assume_role_policy" {
+data "aws_iam_policy_document" "quest_ecs_fargate_task_role_policy_document" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      identifiers = ["ecs-tasks.amazonaws.com"]
+      type        = "Service"
+    }
+  }
+}
+
+
+# Boilerplate code to set up the AWS Service Role "ecsTaskExecutionRole" and its related Policies
+# https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html
+resource "aws_iam_role" "ecsTaskExecutionRole" {
+  name               = "ecsTaskExecutionRole"
+  assume_role_policy = data.aws_iam_policy_document.ecsTaskExecutionRole_assume_role_policy_document.json
+}
+
+data "aws_iam_policy_document" "ecsTaskExecutionRole_assume_role_policy_document" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
@@ -158,3 +178,4 @@ resource "aws_iam_role_policy_attachment" "ecsTaskExecutionRole_policy" {
   role       = aws_iam_role.ecsTaskExecutionRole.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
+
