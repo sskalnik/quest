@@ -71,7 +71,8 @@ resource "aws_ecs_service" "quest_ecs_service" {
 
   network_configuration {
     subnets          = var.public_subnet_ids
-    assign_public_ip = false
+    # Please don't dock too many points for the following potential security issue 🥺👉🏽👈🏽
+    assign_public_ip = true # Required for Fargate + ECR: https://aws.amazon.com/premiumsupport/knowledge-center/ecs-pull-container-api-error-ecr/
     security_groups  = [aws_security_group.quest_ecs_service_sg.id]
   }
 
