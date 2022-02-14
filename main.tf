@@ -33,10 +33,35 @@ resource "aws_subnet" "quest_public_subnet" {
 resource "aws_ecr_repository" "quest_ecr" {
   name = "quest_ecr"
 
+  # Needed in order to put the latest tag on a given container image
+  image_tag_mutability = "MUTABLE"
+
   # Scan all container images for security issues/vulnerabilities as soon as the images are pushed to the repo
   image_scanning_configuration {
     scan_on_push = true
   }
+}
+
+
+# This is overkill for a take-home test, but best practices and all that...
+# No reason for 16 images... I just picked an arbitrary power of 2.
+resource "aws_ecr_lifecycle_policy" "only_keep_last_16_images" {
+  repository = aws_ecr_repository.quest_ecr.name
+
+  policy = jsonencode({
+   rules = [{
+     rulePriority = 1
+     description  = "Only keep last 16 images in ECR. No reason for 16... the dev just picked an arbitrary power of 2."
+     action       = {
+       type = "expire"
+     }
+     selection     = {
+       tagStatus   = "any"
+       countType   = "imageCountMoreThan"
+       countNumber = 16
+     }
+   }]
+  })
 }
 
 
@@ -76,9 +101,12 @@ resource "aws_ecs_task_definition" "quest_ecs_fargate_task" {
 resource "aws_security_group" "quest_ecs_service_sg" {
   description =  "Only allow incoming traffic from the ALB in front of the ECS Service"
 
+  vpc_id = var.vpc_id
+
   ingress {
-    from_port       = 0
-    to_port         = 0
+    # Assume port 3000 for the containers/Tasks
+    from_port       = 3000
+    to_port         = 3000
     protocol        = "-1"
     # Only allow incoming traffic from the ALB in front of the ECS Service
     security_groups = [aws_security_group.quest_alb_sg.id]
@@ -143,7 +171,7 @@ resource "aws_lb_target_group" "quest_alb_target_group" {
 
 resource "aws_lb_listener" "quest_alb_listener_http" {
   load_balancer_arn = aws_alb.quest_alb.arn
-  port              = "80"
+  port              = 80
   #tfsec:ignore:AWS004
   protocol          = "HTTP"
 
@@ -151,14 +179,38 @@ resource "aws_lb_listener" "quest_alb_listener_http" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.quest_alb_target_group.arn
   }
+  # TODO: set up TLS using an ACM Cert
+  # default_action {
+  #   type = "redirect"
+  #
+  #   redirect {
+  #     port        = 443
+  #     protocol    = "HTTPS"
+  #     status_code = "HTTP_301"
+  #   }
+  # }
 }
+
+# TODO: set up TLS using an ACM Cert
+# resource "aws_alb_listener" "https" {
+#   load_balancer_arn = aws_lb.quest_alb.id
+#   port              = 443
+#   protocol          = "HTTPS"
+#
+#   ssl_policy        = "ELBSecurityPolicy-2016-08"
+#   certificate_arn   = TODO
+#
+#   default_action {
+#     target_group_arn = aws_alb_target_group.quest_alb_target_group.arn
+#     type             = "forward"
+#   }
+# }
 
 
 resource "aws_security_group" "quest_alb_sg" {
   description = "Allow HTTP 80 TCP and HTTPS 443 TCP incoming to the ALB. Allow any outgoing traffic."
 
-  ingress_rules       = ["http-80-tcp", "https-443-tcp"]
-  ingress_cidr_blocks = ["0.0.0.0/0"]
+  vpc_id = var.vpc_id
 
   ingress {
     description = "Allow incoming HTTP 80 TCP from anywhere (public Internet) to the ALB."
