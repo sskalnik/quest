@@ -3,8 +3,8 @@ variable "vpc_id" {
   description = "ID of a VPC in which to deploy the ECS cluster, ALB, etc."
 
   validation {
-    condition     = can(regex("^[a-z\\-]+[a-z]$", var.vpc_id))
-    error_message = "\"vpc_id\" can only contain lower case letters and hyphens!"
+    condition     = can(regex("^[0-9a-z\\-]+[0-9a-z]$", var.vpc_id))
+    error_message = "\"vpc_id\" can only contain lower case letters, numbers, and hyphens!"
   }
 }
 
@@ -20,3 +20,8 @@ variable "ecs_service_desired_task_count" {
   default     = 3 # Good rule of thumb number for fault tolerance, demonstrating scaling up and down, and preventing split-brain and/or election problems.
 }
 
+variable "docker_image_tag" {
+  type        = string
+  description = "String with which the Docker image will be tagged when pushed to ECR."
+  default     = "quest"
+}

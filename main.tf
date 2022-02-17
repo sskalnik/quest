@@ -4,9 +4,10 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# Pick two random AZs for two public subnets
 resource "random_shuffle" "get_a_random_az" {
   input        = data.aws_availability_zones.available.names
-  result_count = 1
+  result_count = 2
 }
 
 data "aws_vpc" "vpc" {
@@ -20,11 +21,11 @@ resource "aws_subnet" "quest_public_subnet" {
   #   Do not create this resource
   # Else
   #   Create a public subnet
-  count = length(var.public_subnet_ids) > 0 ? 0 : 1
+  count = length(var.public_subnet_ids) > 1 ? 0 : 2
 
   vpc_id                  = var.vpc_id
-  cidr_block              = cidrsubnet(data.aws_vpc.vpc.cidr_block, 4, 1)
-  availability_zone       = random_shuffle.get_a_random_az.result
+  cidr_block              = cidrsubnet(data.aws_vpc.vpc.cidr_block, 8, (count.index + 1))
+  availability_zone       = random_shuffle.get_a_random_az.result[count.index]
   map_public_ip_on_launch = true
 }
 
@@ -76,7 +77,7 @@ resource "aws_ecs_task_definition" "quest_ecs_fargate_task" {
   [
     {
       "name": "quest_ecs_fargate_task",
-      "image": "${aws_ecr_repository.quest_ecr.repository_url}",
+      "image": "${aws_ecr_repository.quest_ecr.repository_url}:latest",
       "essential": true,
       "portMappings": [
         {
@@ -107,7 +108,7 @@ resource "aws_security_group" "quest_ecs_service_sg" {
     # Assume port 3000 for the containers/Tasks
     from_port       = 3000
     to_port         = 3000
-    protocol        = "-1"
+    protocol        = "tcp"
     # Only allow incoming traffic from the ALB in front of the ECS Service
     security_groups = [aws_security_group.quest_alb_sg.id]
   }
@@ -131,8 +132,8 @@ resource "aws_ecs_service" "quest_ecs_service" {
   desired_count   = var.ecs_service_desired_task_count
 
   network_configuration {
-    # Either use the input variable var.public_subnet_ids, or use a singleton list containing the ID of a public subnet that is only created when none are input.
-    subnets          = length(var.public_subnet_ids) > 0 ? var.public_subnet_ids : [aws_subnet.quest_public_subnet.id]
+    # Either use var.public_subnet_ids, or use a list containing the IDs of 2 public subnets that are only created when none are input.
+    subnets          = length(var.public_subnet_ids) > 0 ? var.public_subnet_ids : aws_subnet.quest_public_subnet[*].id
     # Please don't dock too many points for the following potential security issue 🥺👉🏽👈🏽
     assign_public_ip = true # Required for Fargate + ECR: https://aws.amazon.com/premiumsupport/knowledge-center/ecs-pull-container-api-error-ecr/
     security_groups  = [aws_security_group.quest_ecs_service_sg.id]
@@ -140,7 +141,7 @@ resource "aws_ecs_service" "quest_ecs_service" {
 
   load_balancer {
     target_group_arn = aws_lb_target_group.quest_alb_target_group.arn
-    container_name   = aws_ecs_task_definition.quest_cluster.family
+    container_name   = aws_ecs_task_definition.quest_ecs_fargate_task.family
     container_port   = 3000
   }
 }
@@ -148,16 +149,17 @@ resource "aws_ecs_service" "quest_ecs_service" {
 # Set up an AWS Application Load Balancer to accept edge Internet traffic and load balance between the ECS/Fargate Tasks (containers)
 #tfsec:ignore:AWS005
 resource "aws_alb" "quest_alb" {
-  name               = "quest_alb"
+  name               = "quest-alb" # The fact that this field can include hyphens but not underscores is a source of great ire...
   load_balancer_type = "application"
-  subnets            = var.public_subnet_ids
+  # Either use var.public_subnet_ids, or use a list containing the IDs of 2 public subnets that are only created when none are input.
+  subnets            = length(var.public_subnet_ids) > 0 ? var.public_subnet_ids : aws_subnet.quest_public_subnet[*].id
   security_groups    = [aws_security_group.quest_alb_sg.id]
 }
 
 
 resource "aws_lb_target_group" "quest_alb_target_group" {
   name        = "quest-alb-target-group" # The fact that this field can include hyphens but not underscores is a source of great ire...
-  port        = 80
+  port        = 3000
   protocol    = "HTTP"
   target_type = "ip"
   vpc_id      = var.vpc_id
@@ -216,7 +218,7 @@ resource "aws_security_group" "quest_alb_sg" {
     description = "Allow incoming HTTP 80 TCP from anywhere (public Internet) to the ALB."
     from_port   = 80
     to_port     = 80
-    protocol    = "-1"
+    protocol    = "tcp"
     #tfsec:ignore:AWS008
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -225,7 +227,7 @@ resource "aws_security_group" "quest_alb_sg" {
     description = "Allow incoming HTTPS 443 TCP from anywhere (public Internet) to the ALB."
     from_port   = 443
     to_port     = 443
-    protocol    = "-1"
+    protocol    = "tcp"
     #tfsec:ignore:AWS008
     cidr_blocks = ["0.0.0.0/0"]
   }

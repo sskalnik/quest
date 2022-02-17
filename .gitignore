@@ -22,3 +22,6 @@ crash.log
 
 # Ignore the Lambda .zip file
 **.zip
+
+# Don't upload installed libraries
+**/node_modules

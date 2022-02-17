@@ -1,7 +1,9 @@
 # Deploy the app in a Docker container. Use node as the base image. Version node:10 or later should work.
-FROM node:10
+#FROM node:10
+FROM node:current-alpine
 # git is needed to pull the source from github, obviously
-RUN yum install -y git
+# RUN yum install -y git
+RUN apk add --no-cache git openssh-client
 # Pull down the source code from git, placing it into /app
 RUN mkdir -p /app && git clone https://github.com/rearc/quest /app
 # Install dependencies in working directory
