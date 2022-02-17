@@ -13,6 +13,8 @@ RUN npm install
 # Copy only what we need, excluding dev files
 COPY bin ./bin
 COPY src ./src
+# It would be much more secure in a real life situation to use AWS Secrets Manager or something similar to store any actual secrets, but good enough for a demo?
+ENV SECRET_WORD=TwelveFactor
 # Serve the application on port 3000, even though that's something one would usually use for dev
 EXPOSE 3000
 # One could have written `CMD [ "node", "src/000.js" ]`
