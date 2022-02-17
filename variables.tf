@@ -23,5 +23,5 @@ variable "ecs_service_desired_task_count" {
 variable "docker_image_tag" {
   type        = string
   description = "String with which the Docker image will be tagged when pushed to ECR."
-  default     = "quest"
+  default     = "latest"
 }

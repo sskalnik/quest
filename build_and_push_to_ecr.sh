@@ -1,6 +1,9 @@
 #!/bin/bash -xe
 
-aws ecr get-login-password | docker login --username AWS --password-stdin "$2" && docker build -t $3 $1 && docker push "$2:latest"
+# aws ecr get-login-password | docker login --username AWS --password-stdin 152186773809.dkr.ecr.us-east-2.amazonaws.com/quest_ecr
+# docker build -t latest .
+# docker push
+aws ecr get-login-password | docker login --username AWS --password-stdin "$2" && docker build -t "$2:$3" $1 && docker push "$2:$3"
 
 #docker_image_source_path="$1"
 #ecr_url="$2"
