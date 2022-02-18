@@ -127,9 +127,9 @@ resource "aws_acm_certificate_validation" "result" {
     for record in aws_route53_record.cert_validation : record.fqdn
   ]
 
-  // If this takes more than 5 minutes, something is probably wrong. Set to 10 minutes to allow for leeway. Default is 45 minutes.
+  // If this takes more than 5 minutes, something is probably wrong. Set to 15 minutes to allow for leeway. Default is 45 minutes.
   timeouts {
-    create = "10m"
+    create = "15m"
   }
 }
 
