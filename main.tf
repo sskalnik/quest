@@ -24,7 +24,7 @@ resource "aws_subnet" "quest_public_subnet" {
   count = length(var.public_subnet_ids) > 1 ? 0 : 2
 
   vpc_id                  = var.vpc_id
-  cidr_block              = cidrsubnet(data.aws_vpc.vpc.cidr_block, 8, (count.index + 1))
+  cidr_block              = cidrsubnet(data.aws_vpc.vpc.cidr_block, 8, (count.index + 4)) # +4 to avoid conflicts with extant subnets
   availability_zone       = random_shuffle.get_a_random_az.result[count.index]
   map_public_ip_on_launch = true
 }

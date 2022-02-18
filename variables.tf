@@ -25,3 +25,9 @@ variable "docker_image_tag" {
   description = "String with which the Docker image will be tagged when pushed to ECR."
   default     = "latest"
 }
+
+variable "root_domain_name" {
+  type        = string
+  description = "Root domain name, such as `example.com`, for which TF will generate an ACM cert and a CF distribution."
+  default     = "rearc.homewor.cc"
+}
